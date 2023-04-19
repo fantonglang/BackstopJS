@@ -5,7 +5,7 @@ const storeFailedDiff = require('./store-failed-diff.js');
 process.on('message', compare);
 
 function compare (data) {
-  const { referencePath, testPath, resembleOutputSettings, pair } = data;
+  const { referencePath, testPath, resembleOutputSettings, pair, forceDiffPng } = data;
   const promise = compareHashes(referencePath, testPath)
     .catch(() => compareResemble(referencePath, testPath, pair.misMatchThreshold, resembleOutputSettings, pair.requireSameDimensions));
   promise
@@ -18,7 +18,7 @@ function compare (data) {
       pair.diff = data;
       pair.status = 'fail';
 
-      return storeFailedDiff(testPath, data).then(function (compare) {
+      return storeFailedDiff(testPath, data, forceDiffPng).then(function (compare) {
         pair.diffImage = compare;
         return sendMessage(pair);
       });

@@ -9,11 +9,12 @@ const storeFailedDiffStub = require('./store-failed-diff-stub.js');
 
 const ASYNC_COMPARE_LIMIT = 20;
 
-function comparePair (pair, report, config, compareConfig) {
+async function comparePair (pair, report, config, compareConfig) {
   const Test = report.addTest(pair);
 
   const referencePath = pair.reference ? path.resolve(config.projectPath, pair.reference) : '';
   const testPath = pair.test ? path.resolve(config.projectPath, pair.test) : '';
+  const forceDiffPng = !!config.args.config.forceDiffPng;
 
   // TEST RUN ERROR/EXCEPTION
   if (!referencePath || !testPath) {
@@ -21,25 +22,25 @@ function comparePair (pair, report, config, compareConfig) {
     Test.status = 'fail';
     logger.error(MSG);
     pair.error = MSG;
-    return Promise.resolve(pair);
+    return pair;
   }
 
   // REFERENCE NOT FOUND ERROR
   if (!fs.existsSync(referencePath)) {
     // save a failed image stub
-    storeFailedDiffStub(testPath);
+    storeFailedDiffStub(testPath, forceDiffPng);
 
     Test.status = 'fail';
     logger.error('Reference image not found ' + pair.fileName);
     pair.error = 'Reference file not found ' + referencePath;
-    return Promise.resolve(pair);
+    return pair;
   }
 
   if (!fs.existsSync(testPath)) {
     Test.status = 'fail';
     logger.error('Test image not found ' + pair.fileName);
     pair.error = 'Test file not found ' + testPath;
-    return Promise.resolve(pair);
+    return pair;
   }
 
   if (pair.expect) {
@@ -49,25 +50,33 @@ function comparePair (pair, report, config, compareConfig) {
       const error = `Expect ${pair.expect} images for scenario "${pair.label} (${pair.viewportLabel})", but actually ${scenarioCount} images be found.`;
       logger.error(error);
       pair.error = error;
-      return Promise.resolve(pair);
+      return pair;
     }
   }
 
   const resembleOutputSettings = config.resembleOutputOptions;
-  return compareImages(referencePath, testPath, pair, resembleOutputSettings, Test);
+  try {
+    return await compareImages(referencePath, testPath, pair, resembleOutputSettings, Test, forceDiffPng);
+  } catch (e) {
+    const message = typeof e === 'string'? e: e instanceof Error? e.message: 'unknown error';
+    logger.error(message);
+    pair.error = message
+  }
 }
 
-function compareImages (referencePath, testPath, pair, resembleOutputSettings, Test) {
+function compareImages (referencePath, testPath, pair, resembleOutputSettings, Test, forceDiffPng = false) {
   return new Promise(function (resolve, reject) {
     const worker = cp.fork(require.resolve('./compare'));
     worker.send({
       referencePath,
       testPath,
       resembleOutputSettings,
-      pair
+      pair,
+      forceDiffPng
     });
 
     worker.on('message', function (data) {
+      clearTimeout(timeoutHandle);
       worker.kill();
       Test.status = data.status;
       pair.diff = data.diff;
@@ -81,6 +90,11 @@ function compareImages (referencePath, testPath, pair, resembleOutputSettings, T
 
       resolve(data);
     });
+
+    var timeoutHandle = setTimeout(() => {
+      worker.kill();
+      reject(new Error(`child process hangs/killed accidently, reference path is [${referencePath}]`))
+    }, 60000);
   });
 }
 

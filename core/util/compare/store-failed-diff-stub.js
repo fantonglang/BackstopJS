@@ -6,7 +6,11 @@ const BASE64_PNG_STUB = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 
 // Utility to ensure `backstop approve` finds a diff image
 // call when no reference image exists.
-module.exports = function (testPath) {
+module.exports = function (testPath, forceDiffPng = false) {
+  if (forceDiffPng) {
+    const without_ext = testPath.substring(0, testPath.lastIndexOf('.'));
+    testPath = without_ext + '.png'
+  }
   fs.writeFileSync(getFailedDiffFilename(testPath), BASE64_PNG_STUB, 'base64');
 };
 

@@ -2,8 +2,12 @@ const streamToPromise = require('./../streamToPromise');
 const fs = require('fs');
 const path = require('path');
 
-module.exports = function (testPath, data) {
-  const failedDiffFilename = getFailedDiffFilename(testPath);
+module.exports = function (testPath, data, forceDiffPng = false) {
+  let failedDiffFilename = getFailedDiffFilename(testPath);
+  if (forceDiffPng) {
+    const without_ext = failedDiffFilename.substring(0, testPath.lastIndexOf('.'));
+    failedDiffFilename = without_ext + '.png'
+  }
   console.log('   See:', failedDiffFilename);
 
   const failedDiffStream = fs.createWriteStream(failedDiffFilename);
