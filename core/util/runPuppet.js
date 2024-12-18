@@ -123,6 +123,24 @@ async function processScenarioView (scenario, variantOrScenarioLabelSafe, scenar
     logger.warn('reset', `***WARNING! CHROME VERSION ${MIN_CHROME_VERSION} OR GREATER IS REQUIRED. PLEASE UPDATE YOUR CHROME APP!***`);
   }
 
+  if (scenario.blockAds) {
+    logger.log('blue', '***Block Ads');
+    await page.setRequestInterception(true);
+    const rejectRequestPattern = [
+      "googlesyndication.com",
+      "/*.doubleclick.net",
+      "/*.amazon-adsystem.com",
+      "/*.adnxs.com",
+    ];
+    page.on("request", (request) => {
+      if (rejectRequestPattern.find((pattern) => request.url().match(pattern))) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+  }
+
   let result;
   const puppetCommands = async () => {
     // --- BEFORE SCRIPT ---
